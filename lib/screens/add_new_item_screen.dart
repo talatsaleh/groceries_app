@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:goreceries_app/data/categories.dart';
 import 'package:goreceries_app/module/category_module.dart';
 import 'package:goreceries_app/module/grocery_module.dart';
+import 'package:http/http.dart' as http;
 
 class AddNewItemScreen extends StatefulWidget {
   const AddNewItemScreen({super.key});
@@ -25,14 +28,42 @@ class _AddNewItemScreenState extends State<AddNewItemScreen> {
     super.dispose();
   }
 
-  void _saveForm() {
+  void _saveForm() async {
     _formKey.currentState!.save();
-    final addedItem = GroceryItem(
-        id: DateTime.now().toString(),
-        name: _name,
-        quantity: int.parse(_quantity.text),
-        category: _category);
-    Navigator.of(context).pop(addedItem);
+    // final addedItem = GroceryItem(
+    //     id: DateTime.now().toString(),
+    //     name: _name,
+    //     quantity: int.parse(_quantity.text),
+    //     category: _category);
+    setState(() {
+      _isValid = false;
+    });
+    final url = Uri.https(
+        'groceries-app-c60ac-default-rtdb.firebaseio.com', 'shoping-list.json');
+    final response = await http.post(url,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'name': _name,
+          'quantity': int.parse(_quantity.text),
+          'category': _category.name,
+        }));
+    if (response.statusCode >= 200 &&
+        response.statusCode < 300 &&
+        context.mounted) {
+      final Map<String, dynamic> data = jsonDecode(response.body);
+      Navigator.of(context).pop(GroceryItem(
+          id: data['name'],
+          name: _name,
+          quantity: int.parse(_quantity.text),
+          category: _category));
+    } else {
+      _formKey.currentState!.reset();
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('there is error.. try again..')));
+    }
+    // Navigator.of(context).pop(addedItem);
   }
 
   @override

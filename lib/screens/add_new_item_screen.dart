@@ -18,6 +18,7 @@ class _AddNewItemScreenState extends State<AddNewItemScreen> {
   final _nameFormKey = GlobalKey<FormFieldState>();
   final _formKey = GlobalKey<FormState>();
   bool _isValid = false;
+  bool _isDone = false;
   bool _lastState = false;
   late final String _name;
   late final Category _category;
@@ -37,6 +38,7 @@ class _AddNewItemScreenState extends State<AddNewItemScreen> {
     //     category: _category);
     setState(() {
       _isValid = false;
+      _isDone = true;
     });
     final url = Uri.https(
         'groceries-app-c60ac-default-rtdb.firebaseio.com', 'shoping-list.json');
@@ -59,6 +61,9 @@ class _AddNewItemScreenState extends State<AddNewItemScreen> {
           quantity: int.parse(_quantity.text),
           category: _category));
     } else {
+      setState(() {
+        _isDone = false;
+      });
       _formKey.currentState!.reset();
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('there is error.. try again..')));
@@ -208,9 +213,11 @@ class _AddNewItemScreenState extends State<AddNewItemScreen> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () {
-                      _formKey.currentState!.reset();
-                    },
+                    onPressed: _isValid
+                        ? () {
+                            _formKey.currentState!.reset();
+                          }
+                        : null,
                     child: Text(
                       'Reset',
                       style:
@@ -223,7 +230,13 @@ class _AddNewItemScreenState extends State<AddNewItemScreen> {
                             _saveForm();
                           }
                         : null,
-                    child: const Text('Add item'),
+                    child: _isDone
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(),
+                          )
+                        : const Text('Add item'),
                   ),
                 ],
               )

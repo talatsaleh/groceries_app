@@ -17,8 +17,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  var init = false;
   List<GroceryItem> _groceryItems = [];
   var _isLoading = true;
+  String _error = 'There is no Grocery to see..';
 
   void _removeItem(GroceryItem item, int index) async {
     setState(() {
@@ -40,34 +42,48 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _getItems() async {
+  Future<void> _getItems() async {
+    if (init) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+    init = true;
     final List<GroceryItem> items = [];
     final url = Uri.https(
         'groceries-app-c60ac-default-rtdb.firebaseio.com', 'shoping-list.json');
-    final response = await http.get(url);
-    if (response.body == 'null') {
+    try {
+      final response = await http.get(url);
+      if (response.body == 'null') {
+        setState(() {
+          _error = 'There is no Grocery to see..';
+          _isLoading = false;
+        });
+        return;
+      }
+      final Map<String, dynamic> listData = jsonDecode(response.body);
+      for (final item in listData.entries) {
+        final cat.Category catItem = categories.values
+            .firstWhere((cat) => cat.name == item.value['category']);
+        items.add(
+          GroceryItem(
+            id: item.key,
+            name: item.value['name'],
+            quantity: item.value['quantity'],
+            category: catItem,
+          ),
+        );
+      }
+      setState(() {
+        _isLoading = false;
+        _groceryItems = items;
+      });
+    } catch (error) {
+      _error = 'There is problem right now, please try again.';
       setState(() {
         _isLoading = false;
       });
-      return;
     }
-    final Map<String, dynamic> listData = jsonDecode(response.body);
-    for (final item in listData.entries) {
-      final cat.Category catItem = categories.values
-          .firstWhere((cat) => cat.name == item.value['category']);
-      items.add(
-        GroceryItem(
-          id: item.key,
-          name: item.value['name'],
-          quantity: item.value['quantity'],
-          category: catItem,
-        ),
-      );
-    }
-    setState(() {
-      _isLoading = false;
-      _groceryItems = items;
-    });
   }
 
   @override
@@ -108,39 +124,58 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appBar = AppBar(
+      title: const Text('Your Groceries'),
+      actions: [
+        IconButton(onPressed: _addNewItem, icon: const Icon(Icons.add))
+      ],
+    );
+    final height = MediaQuery.of(context).size.height -
+        MediaQuery.of(context).padding.top -
+        appBar.preferredSize.height;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Your Groceries'),
-        actions: [
-          IconButton(onPressed: _addNewItem, icon: const Icon(Icons.add))
-        ],
+      appBar: appBar,
+      body: RefreshIndicator(
+        triggerMode: RefreshIndicatorTriggerMode.onEdge,
+        onRefresh: _getItems,
+        child: _isLoading
+            ? SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Container(
+                  alignment: Alignment.center,
+                  height: height,
+                  child: const CircularProgressIndicator(),
+                ),
+              )
+            : Container(
+                alignment: Alignment.center,
+                height: height,
+                child: _groceryItems.isEmpty
+                    ? SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Text(_error),
+                      )
+                    : ListView.builder(
+                        itemCount: _groceryItems.length,
+                        itemBuilder: (ctx, index) {
+                          return Dismissible(
+                            confirmDismiss: _dismissible,
+                            background: Container(
+                              color:
+                                  Theme.of(context).colorScheme.errorContainer,
+                              child: const Icon(Icons.delete),
+                            ),
+                            onDismissed: (_) {
+                              _removeItem(_groceryItems[index], index);
+                            },
+                            key: ValueKey(index),
+                            child: GroceryItemWidget(
+                                grocery: _groceryItems[index]),
+                          );
+                        },
+                      ),
+              ),
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
-          : Center(
-              child: _groceryItems.isEmpty
-                  ? const Text('There is no Grocery to see..')
-                  : ListView.builder(
-                      itemCount: _groceryItems.length,
-                      itemBuilder: (ctx, index) {
-                        return Dismissible(
-                          confirmDismiss: _dismissible,
-                          background: Container(
-                            color: Theme.of(context).colorScheme.errorContainer,
-                            child: const Icon(Icons.delete),
-                          ),
-                          onDismissed: (_) {
-                            _removeItem(_groceryItems[index], index);
-                          },
-                          key: ValueKey(index),
-                          child:
-                              GroceryItemWidget(grocery: _groceryItems[index]),
-                        );
-                      },
-                    ),
-            ),
     );
   }
 }
